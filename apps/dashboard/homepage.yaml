@@ -54,6 +54,9 @@ data:
       Management:
         style: row
         columns: 3
+      Monitoring:
+        style: row
+        columns: 3
 
   services.yaml: |
     - Media:
@@ -61,69 +64,81 @@ data:
             icon: plex.svg
             href: http://192.168.2.245:32400/web
             description: Stream movies & TV
-            widget:
-              type: plex
-              url: http://plex.media.svc.cluster.local:32400
-              key: YOUR_PLEX_TOKEN
         - Overseerr:
             icon: overseerr.svg
-            href: http://overseerr.media.lan
+            href: https://overseerr.media.lan
             description: Request media
             widget:
               type: overseerr
               url: http://overseerr.media.svc.cluster.local:5055
-              key: YOUR_OVERSEERR_API_KEY
+              key: MTc3MDUyMTc5NDIwMzc4OWEwM2JiLWYwMmUtNGIxNS1iNGZjLTUxMmMxMjZlMGQ3OQ==
         - Tautulli:
             icon: tautulli.svg
-            href: http://tautulli.media.lan
+            href: https://tautulli.media.lan
             description: Plex statistics
             widget:
               type: tautulli
               url: http://tautulli.media.svc.cluster.local:8181
-              key: YOUR_TAUTULLI_API_KEY
+              key: af767ff770b641f3b46954c31d72c96e
     - Downloads:
         - Sonarr:
             icon: sonarr.svg
-            href: http://sonarr.media.lan
+            href: https://sonarr.media.lan
             description: TV shows
             widget:
               type: sonarr
               url: http://sonarr.media.svc.cluster.local:8989
-              key: YOUR_SONARR_API_KEY
+              key: 351b878306cf4622bbd4e2edb70aec03
         - Radarr:
             icon: radarr.svg
-            href: http://radarr.media.lan
+            href: https://radarr.media.lan
             description: Movies
             widget:
               type: radarr
               url: http://radarr.media.svc.cluster.local:7878
-              key: YOUR_RADARR_API_KEY
-        - qBittorrent:
-            icon: qbittorrent.svg
-            href: http://qbit.media.lan
-            description: Torrent client
+              key: 97c967aa525c442f9293aa5abd8403c2
+        - SABnzbd:
+            icon: sabnzbd.svg
+            href: https://sabnzbd.media.lan
+            description: Usenet downloads
             widget:
-              type: qbittorrent
-              url: http://qbittorrent.media.svc.cluster.local:8080
-              username: admin
-              password: CHANGEME
+              type: sabnzbd
+              url: http://sabnzbd.media.svc.cluster.local:8080
+              key: a1b4052de75f4c5d90b09a32e2f57945
     - Management:
         - Prowlarr:
             icon: prowlarr.svg
-            href: http://prowlarr.media.lan
+            href: https://prowlarr.media.lan
             description: Indexer manager
             widget:
               type: prowlarr
               url: http://prowlarr.media.svc.cluster.local:9696
-              key: YOUR_PROWLARR_API_KEY
+              key: 57e5026ba1a74b09bd15c47ec0ea6a8c
         - Bazarr:
             icon: bazarr.svg
-            href: http://bazarr.media.lan
+            href: https://bazarr.media.lan
             description: Subtitles
             widget:
               type: bazarr
               url: http://bazarr.media.svc.cluster.local:6767
-              key: YOUR_BAZARR_API_KEY
+              key: 2507f8052f84f26b671e7b69b056dae8
+    - Monitoring:
+        - Grafana:
+            icon: grafana.svg
+            href: https://grafana.media.lan
+            description: Metrics & dashboards
+            widget:
+              type: grafana
+              url: http://kube-prometheus-stack-grafana.media.svc.cluster.local
+              username: admin
+              password: admin
+        - Prometheus:
+            icon: prometheus.svg
+            href: http://kube-prometheus-stack-prometheus.media.svc.cluster.local:9090
+            description: Metrics collection
+            widget:
+              type: prometheus
+              url: http://kube-prometheus-stack-prometheus.media.svc.cluster.local:9090
 
   widgets.yaml: |
     - greeting:
@@ -164,12 +179,24 @@ spec:
         app.kubernetes.io/name: homepage
     spec:
       serviceAccountName: homepage
+      initContainers:
+        - name: seed-config
+          image: busybox:latest
+          command: ["sh", "-c", "cp /src/* /config/"]
+          volumeMounts:
+            - name: config-source
+              mountPath: /src
+            - name: config
+              mountPath: /config
       containers:
         - name: homepage
           image: ghcr.io/gethomepage/homepage:latest
           ports:
             - containerPort: 3000
               name: web
+          env:
+            - name: HOMEPAGE_ALLOWED_HOSTS
+              value: "home.media.lan"
           volumeMounts:
             - name: config
               mountPath: /app/config
@@ -179,11 +206,13 @@ spec:
               memory: 64Mi
             limits:
               cpu: 200m
-              memory: 128Mi
+              memory: 256Mi
       volumes:
-        - name: config
+        - name: config-source
           configMap:
             name: homepage-config
+        - name: config
+          emptyDir: {}
 ---
 apiVersion: v1
 kind: Service
@@ -205,6 +234,9 @@ metadata:
   namespace: media
 spec:
   ingressClassName: traefik
+  tls:
+    - hosts:
+        - home.media.lan
   rules:
     - host: home.media.lan
       http:
