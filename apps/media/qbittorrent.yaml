@@ -1,0 +1,100 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: qbittorrent
+  namespace: media
+spec:
+  interval: 30m
+  chart:
+    spec:
+      chart: app-template
+      sourceRef:
+        kind: HelmRepository
+        name: bjw-s
+        namespace: flux-system
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    remediation:
+      retries: 3
+  values:
+    controllers:
+      qbittorrent:
+        strategy: Recreate
+        containers:
+          app:
+            image:
+              repository: linuxserver/qbittorrent
+              tag: latest
+              pullPolicy: IfNotPresent
+            env:
+              PUID: "1000"
+              PGID: "1000"
+              TZ: "UTC"
+              WEBUI_PORT: "8080"
+            probes:
+              liveness:
+                enabled: true
+                custom: true
+                spec:
+                  httpGet:
+                    path: /api/v2/app/version
+                    port: 8080
+                  periodSeconds: 10
+              readiness:
+                enabled: true
+                custom: true
+                spec:
+                  httpGet:
+                    path: /api/v2/app/version
+                    port: 8080
+                  periodSeconds: 10
+            resources:
+              requests:
+                cpu: 100m
+                memory: 256Mi
+              limits:
+                cpu: 500m
+                memory: 512Mi
+    service:
+      app:
+        controller: qbittorrent
+        ports:
+          http:
+            port: 8080
+      bittorrent:
+        controller: qbittorrent
+        type: LoadBalancer
+        annotations:
+          metallb.universe.tf/loadBalancerIPs: "192.168.2.246"
+        ports:
+          torrent-tcp:
+            port: 6881
+            protocol: TCP
+          torrent-udp:
+            port: 6881
+            protocol: UDP
+    ingress:
+      app:
+        className: traefik
+        hosts:
+          - host: qbit.media.lan
+            paths:
+              - path: /
+                service:
+                  identifier: app
+                  port: http
+    persistence:
+      config:
+        type: persistentVolumeClaim
+        accessMode: ReadWriteOnce
+        size: 1Gi
+        storageClass: nfs-appdata
+        globalMounts:
+          - path: /config
+      data:
+        type: persistentVolumeClaim
+        existingClaim: media-data
+        globalMounts:
+          - path: /data

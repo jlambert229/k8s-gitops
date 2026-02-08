@@ -1,0 +1,17 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  # Namespace + shared storage
+  - media/namespace.yaml
+  - media/storage.yaml
+  # Media apps (bjw-s/app-template HelmReleases)
+  - media/plex.yaml
+  - media/sonarr.yaml
+  - media/radarr.yaml
+  - media/prowlarr.yaml
+  - media/qbittorrent.yaml
+  - media/bazarr.yaml
+  - media/overseerr.yaml
+  - media/tautulli.yaml
+  # Dashboard
+  - dashboard/homepage.yaml

@@ -1,0 +1,17 @@
+# Dynamic NFS provisioner for per-app config volumes.
+# Each PVC gets its own subdirectory under the NFS share.
+---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: nfs-appdata
+provisioner: nfs.csi.k8s.io
+parameters:
+  server: "192.168.2.129"
+  share: "/volume1/nfs01/k8s-appdata"
+reclaimPolicy: Retain
+volumeBindingMode: Immediate
+allowVolumeExpansion: true
+mountOptions:
+  - nfsvers=3
+  - nolock

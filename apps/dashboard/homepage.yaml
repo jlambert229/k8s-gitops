@@ -1,0 +1,218 @@
+# Homepage — Dashboard for the media stack
+# Web UI: http://home.media.lan
+#
+# API keys: After setting up each app, grab its API key and update
+# the ConfigMap below, then restart: kubectl rollout restart -n media deploy/homepage
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: homepage
+  namespace: media
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: homepage
+rules:
+  - apiGroups: [""]
+    resources: [namespaces, pods, nodes]
+    verbs: [get, list]
+  - apiGroups: ["metrics.k8s.io"]
+    resources: [pods, nodes]
+    verbs: [get, list]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: homepage
+subjects:
+  - kind: ServiceAccount
+    name: homepage
+    namespace: media
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: homepage
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: homepage-config
+  namespace: media
+data:
+  settings.yaml: |
+    title: Media Server
+    favicon: https://cdn.jsdelivr.net/gh/walkxcode/dashboard-icons/png/homepage.png
+    layout:
+      Media:
+        style: row
+        columns: 3
+      Downloads:
+        style: row
+        columns: 3
+      Management:
+        style: row
+        columns: 3
+
+  services.yaml: |
+    - Media:
+        - Plex:
+            icon: plex.svg
+            href: http://192.168.2.245:32400/web
+            description: Stream movies & TV
+            widget:
+              type: plex
+              url: http://plex.media.svc.cluster.local:32400
+              key: YOUR_PLEX_TOKEN
+        - Overseerr:
+            icon: overseerr.svg
+            href: http://overseerr.media.lan
+            description: Request media
+            widget:
+              type: overseerr
+              url: http://overseerr.media.svc.cluster.local:5055
+              key: YOUR_OVERSEERR_API_KEY
+        - Tautulli:
+            icon: tautulli.svg
+            href: http://tautulli.media.lan
+            description: Plex statistics
+            widget:
+              type: tautulli
+              url: http://tautulli.media.svc.cluster.local:8181
+              key: YOUR_TAUTULLI_API_KEY
+    - Downloads:
+        - Sonarr:
+            icon: sonarr.svg
+            href: http://sonarr.media.lan
+            description: TV shows
+            widget:
+              type: sonarr
+              url: http://sonarr.media.svc.cluster.local:8989
+              key: YOUR_SONARR_API_KEY
+        - Radarr:
+            icon: radarr.svg
+            href: http://radarr.media.lan
+            description: Movies
+            widget:
+              type: radarr
+              url: http://radarr.media.svc.cluster.local:7878
+              key: YOUR_RADARR_API_KEY
+        - qBittorrent:
+            icon: qbittorrent.svg
+            href: http://qbit.media.lan
+            description: Torrent client
+            widget:
+              type: qbittorrent
+              url: http://qbittorrent.media.svc.cluster.local:8080
+              username: admin
+              password: CHANGEME
+    - Management:
+        - Prowlarr:
+            icon: prowlarr.svg
+            href: http://prowlarr.media.lan
+            description: Indexer manager
+            widget:
+              type: prowlarr
+              url: http://prowlarr.media.svc.cluster.local:9696
+              key: YOUR_PROWLARR_API_KEY
+        - Bazarr:
+            icon: bazarr.svg
+            href: http://bazarr.media.lan
+            description: Subtitles
+            widget:
+              type: bazarr
+              url: http://bazarr.media.svc.cluster.local:6767
+              key: YOUR_BAZARR_API_KEY
+
+  widgets.yaml: |
+    - greeting:
+        text_size: 2xl
+        text: Media Server
+    - kubernetes:
+        cluster:
+          show: true
+          cpu: true
+          memory: true
+        nodes:
+          show: true
+
+  bookmarks.yaml: |
+    []
+
+  docker.yaml: |
+    {}
+
+  kubernetes.yaml: |
+    mode: cluster
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: homepage
+  namespace: media
+  labels:
+    app.kubernetes.io/name: homepage
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: homepage
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: homepage
+    spec:
+      serviceAccountName: homepage
+      containers:
+        - name: homepage
+          image: ghcr.io/gethomepage/homepage:latest
+          ports:
+            - containerPort: 3000
+              name: web
+          volumeMounts:
+            - name: config
+              mountPath: /app/config
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+      volumes:
+        - name: config
+          configMap:
+            name: homepage-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: homepage
+  namespace: media
+spec:
+  selector:
+    app.kubernetes.io/name: homepage
+  ports:
+    - name: web
+      port: 3000
+      targetPort: 3000
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: homepage
+  namespace: media
+spec:
+  ingressClassName: traefik
+  rules:
+    - host: home.media.lan
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: homepage
+                port:
+                  number: 3000

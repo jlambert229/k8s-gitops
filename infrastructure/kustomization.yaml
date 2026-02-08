@@ -1,0 +1,15 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  # Helm chart sources
+  - sources/helm-repositories.yaml
+  # MetalLB — bare-metal load balancer
+  - metallb/namespace.yaml
+  - metallb/helmrelease.yaml
+  - metallb/config.yaml
+  # NFS CSI — persistent storage
+  - nfs-csi/helmrelease.yaml
+  - nfs-csi/storageclass.yaml
+  # Traefik — ingress controller
+  - traefik/namespace.yaml
+  - traefik/helmrelease.yaml
