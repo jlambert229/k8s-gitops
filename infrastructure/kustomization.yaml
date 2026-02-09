@@ -13,3 +13,12 @@ resources:
   # Traefik — ingress controller
   - traefik/namespace.yaml
   - traefik/helmrelease.yaml
+  # Vault — secret management
+  - vault/namespace.yaml
+  - vault/helmrelease.yaml
+  - vault/init-config.yaml
+  # External Secrets Operator — sync secrets from Vault to k8s
+  - external-secrets/namespace.yaml
+  - external-secrets/helmrelease.yaml
+  - external-secrets/rbac.yaml
+  - external-secrets/secretstore.yaml

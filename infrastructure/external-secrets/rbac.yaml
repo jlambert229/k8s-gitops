@@ -1,0 +1,13 @@
+# Service accounts for External Secrets to authenticate with Vault
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: external-secrets-sa
+  namespace: media
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: external-secrets-sa
+  namespace: monitoring

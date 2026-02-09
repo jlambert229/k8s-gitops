@@ -1,0 +1,71 @@
+# ConfigMap with Vault initialization script
+# This enables KV v2 secrets engine and creates the initial secret structure
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: vault-init-script
+  namespace: vault
+data:
+  init.sh: |
+    #!/bin/sh
+    set -e
+
+    # Wait for Vault to be ready
+    until vault status > /dev/null 2>&1; do
+      echo "Waiting for Vault to be ready..."
+      sleep 2
+    done
+
+    # Login with root token
+    vault login root
+
+    # Enable KV v2 secrets engine at 'secret/' if not already enabled
+    vault secrets list | grep -q "^secret/" || vault secrets enable -path=secret kv-v2
+
+    # Create default policies
+    vault policy write media-apps - <<EOF
+    path "secret/data/media/*" {
+      capabilities = ["read", "list"]
+    }
+    path "secret/data/monitoring/*" {
+      capabilities = ["read", "list"]
+    }
+    EOF
+
+    # Enable Kubernetes auth method if not already enabled
+    vault auth list | grep -q "^kubernetes/" || vault auth enable kubernetes
+
+    # Configure Kubernetes auth (requires service account token)
+    # This will be configured by External Secrets Operator
+
+    echo "Vault initialization complete!"
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: vault-init
+  namespace: vault
+spec:
+  template:
+    spec:
+      serviceAccountName: vault
+      restartPolicy: OnFailure
+      containers:
+        - name: vault-init
+          image: hashicorp/vault:1.15.4
+          env:
+            - name: VAULT_ADDR
+              value: "http://vault:8200"
+            - name: VAULT_TOKEN
+              value: "root"
+          command: ["/bin/sh"]
+          args: ["/scripts/init.sh"]
+          volumeMounts:
+            - name: init-script
+              mountPath: /scripts
+      volumes:
+        - name: init-script
+          configMap:
+            name: vault-init-script
+            defaultMode: 0755
